@@ -8,20 +8,34 @@
 // From v1.0.10, WPA2 passwords can be up to 63 characters long.
 #define PASS_MAX_LEN 64
 
+// typedef struct
+// {
+//     char wifi_ssid_local[SSID_MAX_LEN];
+//     char wifi_pw_local[PASS_MAX_LEN];
+
+//     char wifi_ssid[SSID_MAX_LEN];
+//     char wifi_pw[10][PASS_MAX_LEN];
+
+//     bool useStaticIP;
+//     IPAddress staticIP;
+//     IPAddress gatewayIP;
+//     IPAddress subnetIP;
+//     char reserved[32];
+// }WiFi_Credentials;
+
+
 typedef struct
 {
-    char wifi_ssid_local[SSID_MAX_LEN];
-    char wifi_pw_local[PASS_MAX_LEN];
+  char wifi_ssid[SSID_MAX_LEN];
+  char wifi_pw[PASS_MAX_LEN];
+  bool useStaticIP;
+  IPAddress staticIP;
+  IPAddress gatewayIP;
+  IPAddress subnetIP;
+  char reserved[32];
+} WiFi_Credentials;
 
-    char wifi_ssid[SSID_MAX_LEN];
-    char wifi_pw[10][PASS_MAX_LEN];
 
-    bool useStaticIP;
-    IPAddress staticIP;
-    IPAddress gatewayIP;
-    IPAddress subnetIP;
-    char reserved[32];
-}WiFi_Credentials;
 
 typedef struct
 {
@@ -42,10 +56,24 @@ typedef struct
 
 }device_config_data;
 
+
+
+#define NUM_WIFI_CREDENTIALS 10
+
 typedef struct
-{
-  WiFi_Credentials WiFi_Creds;
+{ 
+  WiFi_Credentials local_Creds;
+
+  WiFi_Credentials WiFi_Creds[NUM_WIFI_CREDENTIALS];
   device_config_data device_config;
-}data_config;
+
+} data_config;
+
+
+// typedef struct
+// {
+//   WiFi_Credentials WiFi_Creds;
+//   device_config_data device_config;
+// }data_config;
 
 #endif

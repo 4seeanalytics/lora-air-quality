@@ -351,11 +351,11 @@ void send_network_config()
     String topicPrefix = WM_config.device_config.topic_prefix;
     String deviceCode = WM_config.device_config.device_code;
 
-    doc["ssid1"] = WM_config.WiFi_Creds.wifi_ssid;
-    doc["usestatic1"] = String(WM_config.WiFi_Creds.useStaticIP);
-    doc["static1"] = WM_config.WiFi_Creds.staticIP.toString();
-    doc["subnet1"] = WM_config.WiFi_Creds.subnetIP.toString();
-    doc["gateway1"] = WM_config.WiFi_Creds.gatewayIP.toString();
+    doc["ssid1"] = WM_config.local_Creds.wifi_ssid;
+    doc["usestatic1"] = String(WM_config.local_Creds.useStaticIP);
+    doc["static1"] = WM_config.local_Creds.staticIP.toString();
+    doc["subnet1"] = WM_config.local_Creds.subnetIP.toString();
+    doc["gateway1"] = WM_config.local_Creds.gatewayIP.toString();
 
     // doc["ssid2"] = WM_config.WiFi_Creds[2].wifi_ssid;
     // doc["usestatic2"] = String(WM_config.WiFi_Creds[2].useStaticIP);

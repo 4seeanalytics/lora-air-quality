@@ -181,7 +181,7 @@ void setup()
 
   serial_print_config(); // Print Config to Serial port
 
-  wifi_available = wifi_scan(WM_config.WiFi_Creds.wifi_ssid);
+  wifi_available = wifi_scan();
 
   if (wifi_available)
   {
@@ -262,6 +262,7 @@ void loop()
     lora_counter++;
     Serial.println("Lora Counter :" + String(lora_counter));
 
+    // lora data sending part
     if (lora_data_sent && lora_counter >= 60)
     {
       lora_counter = 0;

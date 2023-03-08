@@ -33,12 +33,14 @@ void check_WiFi(void)
   }
 }
 
-bool wifi_scan(String ssid)
+bool wifi_scan()
 {
     // Set WiFi to station mode and disconnect from an AP if it was previously connected
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
     delay(100);
+
+    Serial.println("scanning Wifi Networks Nearby");
 
     Serial.println("scan start");
 
@@ -56,15 +58,22 @@ bool wifi_scan(String ssid)
 
         for (uint8_t i = 0; i < n; i++)
         {
-            if (WiFi.SSID(i) == ssid)
+            for (uint8_t j = 0; j < 10; j++)
             {
-                Serial.print(WiFi.SSID(i));
-                Serial.print(" (");
-                Serial.print(WiFi.RSSI(i));
-                Serial.print(")");
-                Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
-                delay(10);
-                return true;
+                if (WiFi.SSID(i) == WM_config.WiFi_Creds[j].wifi_ssid)
+                {
+                    Serial.println("Match Found");
+                    Serial.print(WiFi.SSID(i));
+                    Serial.print(" (");
+                    Serial.print(WiFi.RSSI(i));
+                    Serial.print(")");
+                    Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+                    delay(10);
+
+                    strcpy(WM_config.local_Creds.wifi_ssid,WM_config.WiFi_Creds[j].wifi_ssid);
+
+                    return true;
+                }
             }
         }
     }
@@ -79,10 +88,13 @@ bool connect_to_stored_wifi(void)
     WiFi.disconnect();
     delay(100);
     WiFi.mode(WIFI_STA);
-    debug_string(WM_config.WiFi_Creds.wifi_ssid_local, true);
+
+    debug_string("connecting to stored wifi credentails");
+
+    debug_string(WM_config.local_Creds.wifi_ssid, true);
 
     WiFi.setHostname(chipID.c_str()); // Set the device Hostname
-    WiFi.begin(WM_config.WiFi_Creds.wifi_ssid_local, WM_config.WiFi_Creds.wifi_pw_local);
+    WiFi.begin(WM_config.local_Creds.wifi_ssid, WM_config.local_Creds.wifi_pw);
 
     int i = 0;
 
@@ -127,15 +139,21 @@ bool new_wifi_password(void)
     IPAddress gateway;
     IPAddress subnet;
 
+    debug_string("Connecting to new network...");
+
     for (int i = 0; (i < 10) && (WiFi.status() != WL_CONNECTED); ++i)
     {
         WiFi.disconnect();
         delay(100);
         WiFi.mode(WIFI_STA);
-        debug_string(WM_config.WiFi_Creds.wifi_ssid, true);
+        debug_string(WM_config.local_Creds.wifi_ssid, true);
+        
 
+        Serial.print("Trying password ");
+        Serial.println(i);
+        
         WiFi.setHostname(chipID.c_str()); // Set the device Hostname
-        WiFi.begin(WM_config.WiFi_Creds.wifi_ssid, WM_config.WiFi_Creds.wifi_pw[i]);
+        WiFi.begin(WM_config.local_Creds.wifi_ssid, WM_config.WiFi_Creds[i].wifi_pw);
 
         for (int j = 0; j < 10; ++j)
         {
@@ -154,8 +172,8 @@ bool new_wifi_password(void)
                 debug_string("connected. Local IP: " + WiFi.localIP().toString(), true);
                 res = true;
 
-                strcpy(WM_config.WiFi_Creds.wifi_ssid_local, WM_config.WiFi_Creds.wifi_ssid);
-                strcpy(WM_config.WiFi_Creds.wifi_pw_local, WM_config.WiFi_Creds.wifi_pw[i]);
+                // strcpy(WM_config.WiFi_Creds.wifi_ssid_local, WM_config.WiFi_Creds.wifi_ssid);
+                strcpy(WM_config.local_Creds.wifi_ssid, WM_config.WiFi_Creds[i].wifi_pw);
                 save_config_file();
 
                 break;

@@ -49,8 +49,18 @@
 #define DEFAULT_TIME_ZONE 0000
 
 
-//wifi default ssid and hardcoded passwords
-#define DEFAULT_SSID1 "Secure_Veea"
+//wifi default ssids and hardcoded passwords
+#define DEFAULT_SSID0 "Secure_Veea_1"
+#define DEFAULT_SSID1 "Secure_Veea_2"
+#define DEFAULT_SSID2 "Secure_Veea_3"
+#define DEFAULT_SSID3 "Secure_Veea_4"
+#define DEFAULT_SSID4 "Secure_Veea_5"
+#define DEFAULT_SSID5 "Secure_Veea_6"
+#define DEFAULT_SSID6 "Secure_Veea_7"
+#define DEFAULT_SSID7 "Secure_Veea_8"
+#define DEFAULT_SSID8 "Secure_Veea_9"
+#define DEFAULT_SSID9 "Secure_Veea"
+
 #define DEFAULT_WIFI_PWD0 "securewifi"
 #define DEFAULT_WIFI_PWD1 "securewifi"
 #define DEFAULT_WIFI_PWD2 "securewifi"

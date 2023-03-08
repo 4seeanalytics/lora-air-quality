@@ -109,8 +109,8 @@ void set_defaults()
     WM_config.device_config.data_frequency = DEFAULT_SCANNING_FREQUENCY;
     WM_config.device_config.timeZone = DEFAULT_TIME_ZONE;
 
-    strcpy(WM_config.WiFi_Creds.wifi_ssid_local, DEFAULT_SSID);
-    strcpy(WM_config.WiFi_Creds.wifi_pw_local, DEFAULT_WIFI_PWD);
+    // strcpy(WM_config.local_Creds.wifi_ssid, DEFAULT_SSID);
+    // strcpy(WM_config.local_Creds.wifi_pw, DEFAULT_WIFI_PWD);
 
     strcpy(WM_config.device_config.primary_mqtt_server, PRIMARY_MQTT_SERVER);
     strcpy(WM_config.device_config.secondary_mqtt_server, SECONDARY_MQTT_SERVER);
@@ -124,22 +124,37 @@ void set_defaults()
     // WM_config.device_config.secondaryDNS = DEFAULT_DNS_SECONDARY;
 
     // WM_config.device_config.setupMode = 1;
-    WM_config.WiFi_Creds.useStaticIP = false;
 
-    strcpy(WM_config.WiFi_Creds.wifi_ssid_local, BLANK_STRING);
-    strcpy(WM_config.WiFi_Creds.wifi_pw_local, BLANK_STRING);
+    for (uint8_t i = 0; i < 10; i++){
+        WM_config.WiFi_Creds[i].useStaticIP = false;
+    }
 
-    strcpy(WM_config.WiFi_Creds.wifi_ssid, DEFAULT_SSID1);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[0], DEFAULT_WIFI_PWD0);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[1], DEFAULT_WIFI_PWD1);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[2], DEFAULT_WIFI_PWD2);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[3], DEFAULT_WIFI_PWD3);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[4], DEFAULT_WIFI_PWD4);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[5], DEFAULT_WIFI_PWD5);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[6], DEFAULT_WIFI_PWD6);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[7], DEFAULT_WIFI_PWD7);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[8], DEFAULT_WIFI_PWD8);
-    strcpy(WM_config.WiFi_Creds.wifi_pw[9], DEFAULT_WIFI_PWD9);
+    strcpy(WM_config.local_Creds.wifi_ssid, BLANK_STRING);
+    strcpy(WM_config.local_Creds.wifi_pw, BLANK_STRING);
+
+
+    strcpy(WM_config.WiFi_Creds[0].wifi_ssid, DEFAULT_SSID0);
+    strcpy(WM_config.WiFi_Creds[1].wifi_ssid, DEFAULT_SSID1);
+    strcpy(WM_config.WiFi_Creds[2].wifi_ssid, DEFAULT_SSID2);
+    strcpy(WM_config.WiFi_Creds[3].wifi_ssid, DEFAULT_SSID3);
+    strcpy(WM_config.WiFi_Creds[4].wifi_ssid, DEFAULT_SSID4);
+    strcpy(WM_config.WiFi_Creds[5].wifi_ssid, DEFAULT_SSID5);
+    strcpy(WM_config.WiFi_Creds[6].wifi_ssid, DEFAULT_SSID6);
+    strcpy(WM_config.WiFi_Creds[7].wifi_ssid, DEFAULT_SSID7);
+    strcpy(WM_config.WiFi_Creds[8].wifi_ssid, DEFAULT_SSID8);
+    strcpy(WM_config.WiFi_Creds[9].wifi_ssid, DEFAULT_SSID9);
+
+
+    strcpy(WM_config.WiFi_Creds[0].wifi_pw, DEFAULT_WIFI_PWD0);
+    strcpy(WM_config.WiFi_Creds[1].wifi_pw, DEFAULT_WIFI_PWD1);
+    strcpy(WM_config.WiFi_Creds[2].wifi_pw, DEFAULT_WIFI_PWD2);
+    strcpy(WM_config.WiFi_Creds[3].wifi_pw, DEFAULT_WIFI_PWD3);
+    strcpy(WM_config.WiFi_Creds[4].wifi_pw, DEFAULT_WIFI_PWD4);
+    strcpy(WM_config.WiFi_Creds[5].wifi_pw, DEFAULT_WIFI_PWD5);
+    strcpy(WM_config.WiFi_Creds[6].wifi_pw, DEFAULT_WIFI_PWD6);
+    strcpy(WM_config.WiFi_Creds[7].wifi_pw, DEFAULT_WIFI_PWD7);
+    strcpy(WM_config.WiFi_Creds[8].wifi_pw, DEFAULT_WIFI_PWD8);
+    strcpy(WM_config.WiFi_Creds[9].wifi_pw, DEFAULT_WIFI_PWD9);
 
     WM_config.device_config.calibrate_humidity_a = 1;
     WM_config.device_config.calibrate_humidity_b = 0;
@@ -258,7 +273,7 @@ void serial_print_config()
     Serial.println(chipID);
 
     Serial.print("$$WiFi1=");
-    Serial.println(WM_config.WiFi_Creds.wifi_ssid);
+    Serial.println(WM_config.local_Creds.wifi_ssid);
 }
 
 /******************************************
@@ -272,7 +287,7 @@ void check_configurations()
 {
     deviceHasConfig = read_config_file();
 
-    String ssid = WM_config.WiFi_Creds.wifi_ssid_local;
+    String ssid = WM_config.local_Creds.wifi_ssid;
     ssid.trim();
 
     if (ssid == "")
