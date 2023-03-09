@@ -181,33 +181,6 @@ void setup()
 
   serial_print_config(); // Print Config to Serial port
 
-  wifi_available = wifi_scan(WM_config.WiFi_Creds.wifi_ssid);
-
-  if (wifi_available)
-  {
-    wifi_Online = wifi_connect();
-  }
-
-  if (wifi_Online)
-  {
-    // OTA....
-    if (checkUpdateFirmware(SW_VERSION, HW_VERSION) == false)
-    {
-      debug_string("No OTA updates");
-    }
-
-    // mqtt....
-    debug_string("Initialize MQTT ");
-    if (init_mqtt() == true)
-    {
-      mqtt_connected = true;
-      debug_string("MQTT Connected");
-    }
-
-    debug_string("IP Address : " + WiFi.localIP().toString());
-    debug_string("Device mac : " + device_mac);
-  }
-
   init_lora();
 
   // Initalize the sensors
@@ -217,23 +190,9 @@ void setup()
   runner.init();
 
   // Add task to Runner.
-  runner.addTask(task_send_mqtt_hearbeat);
-  runner.addTask(task_check_connectivity);
   runner.addTask(task_scheduled_reboot);
 
-  // Enable the tasks. tasks start after 10 seconds
-  task_send_mqtt_hearbeat.enableDelayed(10000);
-  task_check_connectivity.enableDelayed(10000);
   task_scheduled_reboot.enableDelayed(10000);
-
-  if (wifi_Online)
-  {
-    debug_string("All Good! Proceed to runway with WiFi");
-  }
-  else
-  {
-    debug_string("ERROR! Proceed to runway without WiFI");
-  }
 
   delay(1000);
 }
@@ -245,9 +204,7 @@ void loop()
   // Serial.println("*********** main loop ***********");
 
   loopsPM++;
-  process_cli();     // Process Serial port based commands recevied
   runner.execute();  // Timer execution. Runs timed events like connectivity check, scheduled reboot. etc.
-  mqttclient.loop(); // Process messges received by MQTT subscription
 
   // lora loop.....
   lora_loop();
