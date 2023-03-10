@@ -42,7 +42,7 @@
 #include "common.h"
 
 #include "lora_heltec.h"
-
+ 
 /********************sagar created variables***************/
 
 // on board led
@@ -167,6 +167,9 @@ void setup()
 {
   Serial.begin(115200); // Start the Serial Port
  
+  WiFi.disconnect();
+  WiFi.mode(WIFI_OFF);  
+
   debug_string("Setup hardawre");
   setup_hardawre();
 
