@@ -44,6 +44,9 @@
 
 #include "lora_heltec.h"
 
+#include <HTTPClient.h>
+#include "Ble.h"
+
 /********************sagar created variables***************/
 
 // on board led
@@ -54,9 +57,9 @@ int lora_counter = 0;
 char data_lora[300];
 int data_bytes = 0;
 
-bool wifi_available = false;
-bool wifi_Online = false;
-bool mqtt_connected = false;
+// bool wifi_available = false;
+// bool wifi_Online = false;
+// bool mqtt_connected = false;
 
 // extern data_config WM_config;
 
@@ -87,6 +90,8 @@ extern int previousDiagnosticsMillis;
 extern int previousDataMillis;
 extern int previousSystemMillis;
 
+extern bool isSetupMode;
+
 /**********************************************************/
 
 /******************** LORA*********************/
@@ -96,13 +101,84 @@ String rssi = "RSSI --";
 String packSize = "--";
 String packet;
 
+volatile int deviceConnected = Non;
+volatile bool code_recieved = false;
+
+bool wifi_available = false;
+bool wifi_Online = false;
+bool mqtt_connected = false;
+
+bool device_registered = false;
+
+String bid = WiFi.macAddress();
+
+String device_code_url = "https://stg.secure.live/generatekey?key=" + bid;
+
+bool get_device_code(char *device_code)
+{
+  bool ret = false;
+
+  HTTPClient http;
+
+  Serial.print("[HTTP] begin...\n");
+
+  Serial.println("Connecting to: " + device_code_url);
+
+  http.begin(device_code_url); // HTTP
+
+  Serial.print("[HTTP] GET...\n");
+  // start connection and send HTTP header
+  int httpCode = http.GET();
+  // httpCode will be negative on error
+
+  if (httpCode > 0)
+  {
+    // HTTP header has been send and Server response header has been handled
+    Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+    // file found at server
+    if (httpCode == HTTP_CODE_OK)
+    {
+      String payload = http.getString();
+      Serial.print("Received payload: ");
+      Serial.println(payload);
+
+      StaticJsonDocument<256> doc;
+      deserializeJson(doc, payload);
+      JsonObject documentRoot = doc.as<JsonObject>();
+      // String code = doc["randomKey"];
+      const char *code = doc["randomKey"];
+      Serial.println("3 letter code: " + String(code));
+      strcpy(device_code, code);
+      // *device_code = *code;
+      // Serial.println("Stored : " + String(device_code));
+      ret = true;
+    }
+  }
+  else
+  {
+    Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+
+  return ret;
+}
+
+void EEPROM_Setup(void)
+{
+  if (!EEPROM.begin(EEPROM_SIZE))
+  {
+    delay(1000);
+  }
+  erase_eeprom();
+}
+
 void read_sensors_data()
 {
   int readBytes = Env_Sensor.read();
   if (readBytes > 0)
   {
     String sensorData = Env_Sensor.sensor_data_buffer;
-    
+
     // memcpy(data_lora, Env_Sensor.sensor_data_buffer, readBytes);
     memcpy(data_lora, Env_Sensor.compressed_data.c_str(), readBytes);
     data_bytes = Env_Sensor.compressed_bytes;
@@ -179,97 +255,161 @@ void setup()
   debug_string("Setup hardawre");
   setup_hardawre();
 
-  serial_print_config(); // Print Config to Serial port
-
-  wifi_available = wifi_scan();
-
-  if (wifi_available)
+  if (isSetupMode)
   {
-    wifi_Online = wifi_connect();
-  }
+    EEPROM_Setup();
 
-  if (wifi_Online)
-  {
-    // OTA....
-    if (checkUpdateFirmware(SW_VERSION, HW_VERSION) == false)
+    wifi_available = wifi_scan();
+
+    if (wifi_available)
     {
-      debug_string("No OTA updates");
+      wifi_Online = wifi_connect();
     }
 
-    // mqtt....
-    debug_string("Initialize MQTT ");
-    if (init_mqtt() == true)
+    bool code_res = false;
+    if (wifi_Online)
     {
-      mqtt_connected = true;
-      debug_string("MQTT Connected");
+      code_res = get_device_code(WM_config.device_config.device_code);
     }
 
-    debug_string("IP Address : " + WiFi.localIP().toString());
-    debug_string("Device mac : " + device_mac);
-  }
-
-  init_lora();
-
-  // Initalize the sensors
-  check_sensors();
-
-  // Runner has list of tasks that must be run at a set period
-  runner.init();
-
-  // Add task to Runner.
-  runner.addTask(task_send_mqtt_hearbeat);
-  runner.addTask(task_check_connectivity);
-  runner.addTask(task_scheduled_reboot);
-
-  // Enable the tasks. tasks start after 10 seconds
-  task_send_mqtt_hearbeat.enableDelayed(10000);
-  task_check_connectivity.enableDelayed(10000);
-  task_scheduled_reboot.enableDelayed(10000);
-
-  if (wifi_Online)
-  {
-    debug_string("All Good! Proceed to runway with WiFi");
+    if (code_res)
+    {
+      BLE_init();
+    }
   }
   else
   {
-    debug_string("ERROR! Proceed to runway without WiFI");
-  }
+    serial_print_config(); // Print Config to Serial port
 
-  delay(1000);
+    // Disconnect from wifi. rebooting device retains last connection
+    WiFi.disconnect(true);
+    delay(1000);
+
+    WiFi.onEvent(WiFiEvent); // Bind the wifi event for debug
+
+    WiFi.onEvent(WiFiGotIP, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP); // Fire the event when degvice gets IP Address
+
+    wifi_available = wifi_scan();
+
+    if (wifi_available)
+    {
+      wifi_Online = wifi_connect();
+    }
+
+    if (wifi_Online)
+    {
+      if (checkUpdateFirmware(SW_VERSION, HW_VERSION) == false)
+      {
+        debug_string("No OTA updates");
+      }
+
+      debug_string("Initialize MQTT ");
+      if (init_mqtt() == true)
+      {
+        debug_string("MQTT Connected");
+      }
+
+      debug_string("IP Address : " + WiFi.localIP().toString());
+      debug_string("Device mac : " + device_mac);
+    }
+
+    init_lora();
+
+    // Initalize the sensors
+    check_sensors();
+
+    // Runner has list of tasks that must be run at a set period
+    runner.init();
+
+    // Add task to Runner.
+    runner.addTask(task_send_mqtt_hearbeat);
+    runner.addTask(task_check_connectivity);
+    runner.addTask(task_scheduled_reboot);
+
+    // Enable the tasks. tasks start after 10 seconds
+    task_send_mqtt_hearbeat.enableDelayed(10000);
+    task_check_connectivity.enableDelayed(10000);
+    task_scheduled_reboot.enableDelayed(10000);
+
+    if (wifi_Online)
+    {
+      debug_string("All Good! Proceed to runway with WiFi");
+    }
+    else
+    {
+      debug_string("ERROR! Proceed to runway without WiFI");
+    }
+
+    delay(1000);
+  }
 }
 
 void loop()
 {
   // Serial.println("*********** main loop ***********");
 
-  loopsPM++;
-  process_cli();     // Process Serial port based commands recevied
-  runner.execute();  // Timer execution. Runs timed events like connectivity check, scheduled reboot. etc.
-  mqttclient.loop(); // Process messges received by MQTT subscription
-
-  // lora loop.....
-  lora_loop();
-
-  unsigned long currentMillis = millis(); // Check current time
-
-  // Send data based on data frequency. default is every 10 seconds
-  if (currentMillis - previousDataMillis >= WM_config.device_config.data_frequency * 1000)
+  if (isSetupMode)
   {
-
-    dataLoopsPM++; // Count how many times data loop was executed
-    previousDataMillis = currentMillis;
-    read_sensors_data();
-    lora_counter++;
-    Serial.println("Lora Counter :" + String(lora_counter));
-
-    // lora data sending part
-    if (lora_data_sent && lora_counter >= 60)
+    if (deviceConnected == Ok)
     {
-      lora_counter = 0;
-      lora_data_sent = false;
-      send_data_over_lora(data_lora, data_bytes);
+      deviceConnected = Non;
     }
 
-    display_data_oled();
+    if (code_recieved)
+    {
+      // display succesfull
+      String Ble_revsd = EEPROM_read_String(0);
+      Serial.println("recieved from app : " + Ble_revsd);
+      erase_eeprom();
+      if (strcmp(WM_config.device_config.device_code, Ble_revsd.c_str()))
+      {
+        delay(2000);
+        WM_config.device_config.setupMode = false;
+        save_config_file();
+        esp_restart();
+      }
+      else
+      {
+        deviceConnected = Fail;
+      }
+    }
+
+    if (deviceConnected == Fail)
+    {
+      deviceConnected = Non;
+    }
+  }
+  else
+  {
+    loopsPM++;
+    process_cli();     // Process Serial port based commands recevied
+    runner.execute();  // Timer execution. Runs timed events like connectivity check, scheduled reboot. etc.
+    mqttclient.loop(); // Process messges received by MQTT subscription
+
+    // lora loop.....
+    lora_loop();
+
+    unsigned long currentMillis = millis(); // Check current time
+
+    // Send data based on data frequency. default is every 10 seconds
+    if (currentMillis - previousDataMillis >= WM_config.device_config.data_frequency * 1000)
+    {
+
+      dataLoopsPM++; // Count how many times data loop was executed
+      previousDataMillis = currentMillis;
+      read_sensors_data();
+      lora_counter++;
+      Serial.println("Lora Counter :" + String(lora_counter));
+
+      // lora data sending part
+      if (lora_data_sent && lora_counter >= 60)
+      {
+        lora_counter = 0;
+        lora_data_sent = false;
+        send_data_over_lora(data_lora, data_bytes);
+      }
+
+      display_data_oled();
+    }
   }
 }

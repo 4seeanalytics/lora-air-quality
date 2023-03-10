@@ -51,6 +51,13 @@
 // }
 
 
+enum status
+{
+    Non = 2,
+    Ok = 1,
+    Fail = 0
+};
+
 
 
 

@@ -15,9 +15,13 @@
 
 FS *filesystem = &LITTLEFS;
 
+bool isSetupMode;       // Newly flashed devices default to setup Mode. When in setup mode, it conencts to mqtt.secure.live else to mqtts.secure.live
 bool deviceHasConfig;   // Set to true if device EEPROM has stored configuration
 bool debugMode = false; // Is device in DebugMode ? when in debug mode, all serial messages are sent to MQTT
 bool deviceHasWifiCreds = false;
+
+bool iswifiSet = false;
+bool isCodeSet = false;
 
 // Coutners for Timers
 int previousDiagnosticsMillis = 0;
@@ -34,7 +38,6 @@ unsigned long wifiErrors = 0;       // Wifi Connectivity Errors
 unsigned long mqttErrors = 0;       // MQTT Error
 unsigned long sensorReadErrors = 0; // Sensor read errors
 
-
 StaticJsonDocument<256> doc;
 
 const char *mqtt_server = PRIMARY_MQTT_SERVER;
@@ -48,19 +51,14 @@ int default_mqtts_port = SECONDARY_MQTT_PORT;
 const char *secondary_mqtt_user = SECONDARY_MQTT_USER;
 const char *secondary_mqtt_pass = SECONDARY_MQTT_PASSWORD;
 
-
 String chipID = "Secure-" + String(ESP_getChipId(), HEX);
 
 data_config WM_config;
 
-
 extern PubSubClient mqttclient;
-
 
 WiFiClientSecure client;
 PubSubClient mqttclient(client);
-
-
 
 /******************************************
  * debug_string(string,bool)
@@ -68,7 +66,7 @@ PubSubClient mqttclient(client);
  * Author : Kaushlesh Chandel
  * Last Modified : Build 21-07-08
  *******************************************/
-void debug_string(String msg, bool debug_msg/* = false*/)
+void debug_string(String msg, bool debug_msg /* = false*/)
 {
     if (debug_msg == true)
     {
@@ -87,14 +85,11 @@ void debug_string(String msg, bool debug_msg/* = false*/)
     }
 }
 
-
 void debug_string(String msg)
 {
     Serial.print(">>");
     Serial.println(msg);
 }
-
-
 
 /******************************************
  * set_defaults()
@@ -105,6 +100,8 @@ void debug_string(String msg)
 void set_defaults()
 {
     debug_string("Setting default values", true);
+
+    WM_config.device_config.setupMode = true;
 
     WM_config.device_config.data_frequency = DEFAULT_SCANNING_FREQUENCY;
     WM_config.device_config.timeZone = DEFAULT_TIME_ZONE;
@@ -125,13 +122,13 @@ void set_defaults()
 
     // WM_config.device_config.setupMode = 1;
 
-    for (uint8_t i = 0; i < 10; i++){
+    for (uint8_t i = 0; i < 10; i++)
+    {
         WM_config.WiFi_Creds[i].useStaticIP = false;
     }
 
     strcpy(WM_config.local_Creds.wifi_ssid, BLANK_STRING);
     strcpy(WM_config.local_Creds.wifi_pw, BLANK_STRING);
-
 
     strcpy(WM_config.WiFi_Creds[0].wifi_ssid, DEFAULT_SSID0);
     strcpy(WM_config.WiFi_Creds[1].wifi_ssid, DEFAULT_SSID1);
@@ -143,7 +140,6 @@ void set_defaults()
     strcpy(WM_config.WiFi_Creds[7].wifi_ssid, DEFAULT_SSID7);
     strcpy(WM_config.WiFi_Creds[8].wifi_ssid, DEFAULT_SSID8);
     strcpy(WM_config.WiFi_Creds[9].wifi_ssid, DEFAULT_SSID9);
-
 
     strcpy(WM_config.WiFi_Creds[0].wifi_pw, DEFAULT_WIFI_PWD0);
     strcpy(WM_config.WiFi_Creds[1].wifi_pw, DEFAULT_WIFI_PWD1);
@@ -287,12 +283,23 @@ void check_configurations()
 {
     deviceHasConfig = read_config_file();
 
+    if (WM_config.device_config.setupMode == true)
+    {
+        debug_string("Mode : Setup");
+        isSetupMode = true;
+    }
+    else
+    {
+        debug_string("Mode : Normal");
+        isSetupMode = false;
+    }
+
     String ssid = WM_config.local_Creds.wifi_ssid;
     ssid.trim();
 
     if (ssid == "")
     {
-        debug_string("device doesn't have wifi creds");   
+        debug_string("device doesn't have wifi creds");
         deviceHasWifiCreds = false;
     }
     else
@@ -303,10 +310,14 @@ void check_configurations()
 
     String deviceCode = WM_config.device_config.device_code;
     deviceCode.trim();
-}
 
+    if (deviceCode == "ZZZZ")
+        isCodeSet = false;
+    else
+        isCodeSet = true;
+}
 
 void format_config_file(void)
 {
-  FileFS.format();
+    FileFS.format();
 }
