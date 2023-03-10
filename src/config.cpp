@@ -1,13 +1,10 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
-
+ 
 #include "config.h"
 #include "types.h"
-#include "mqtt.h"
+ 
 
 #include "common.h"
 
@@ -33,35 +30,14 @@ unsigned long lastpacketsSentPM = 1;
 unsigned long wifiErrors = 0;       // Wifi Connectivity Errors
 unsigned long mqttErrors = 0;       // MQTT Error
 unsigned long sensorReadErrors = 0; // Sensor read errors
-
-
-StaticJsonDocument<256> doc;
-
-const char *mqtt_server = PRIMARY_MQTT_SERVER;
-int default_mqtt_port = PRIMARY_MQTT_PORT;
-const char *primary_mqtt_user = PRIMARY_MQTT_USER;
-const char *primary_mqtt_pass = PRIMARY_MQTT_PASSWORD;
-const char *mqtt_subs_topic = DEFAULT_SUB_TOPIC;
-
-const char *mqtts_server = SECONDARY_MQTT_SERVER;
-int default_mqtts_port = SECONDARY_MQTT_PORT;
-const char *secondary_mqtt_user = SECONDARY_MQTT_USER;
-const char *secondary_mqtt_pass = SECONDARY_MQTT_PASSWORD;
+  
 
 
 String chipID = "Secure-" + String(ESP_getChipId(), HEX);
 
 data_config WM_config;
 
-
-extern PubSubClient mqttclient;
-
-
-WiFiClientSecure client;
-PubSubClient mqttclient(client);
-
-
-
+ 
 /******************************************
  * debug_string(string,bool)
  * Prints the message to Serial port and sends to MQTT server when device in debug mode
@@ -80,11 +56,7 @@ void debug_string(String msg, bool debug_msg/* = false*/)
         Serial.print(">>");
         Serial.println(msg);
     }
-
-    if (debugMode == true && mqttclient.connected())
-    {
-        send_mqtt_string("DEBUG", msg, false);
-    }
+ 
 }
 
 
@@ -240,7 +212,7 @@ void serial_print_config()
     Serial.println(WM_config.device_config.device_code);
 
     Serial.print("$$Mac=");
-    Serial.println(get_beacon_id());
+    
 
     // Serial.print("$$Setup=");
     // Serial.println(WM_config.device_config.setupMode);
@@ -257,8 +229,6 @@ void serial_print_config()
     Serial.print("$$ChipID=");
     Serial.println(chipID);
 
-    Serial.print("$$WiFi1=");
-    Serial.println(WM_config.WiFi_Creds.wifi_ssid);
 }
 
 /******************************************

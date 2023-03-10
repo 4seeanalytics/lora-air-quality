@@ -28,16 +28,15 @@
 #include "images.h"
 
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
+ 
 
 #include <TaskScheduler.h>
 
 #include "config.h"
-#include "networking.h"
+ 
 #include "sensor.h"
 #include "types.h"
-#include "mqtt.h"
-#include "ota.h"
+ 
 #include "fx.h"
 
 #include "common.h"
@@ -59,18 +58,16 @@ bool wifi_Online = false;
 bool mqtt_connected = false;
 
 // extern data_config WM_config;
-
-void task_send_mqtt_hearbeatCallback();
-void task_check_connectivityCallback();
+  
 void task_scheduled_rebootCallback();
 
 #define SCHEDULED_REBOOT_TIMER 1 * 25 * 60 * 60 * 1000 // Hours
 #define SCHEDULED_CONNECTIVITY_TIMER 5 * 60 * 1000     // Minutes
 #define SCHEDULED_HEARBEAT_TIMER 1 * 10 * 1000         // Seconds
-
-Task task_send_mqtt_hearbeat(SCHEDULED_HEARBEAT_TIMER, TASK_FOREVER, &task_send_mqtt_hearbeatCallback);
-Task task_check_connectivity(SCHEDULED_CONNECTIVITY_TIMER, TASK_FOREVER, &task_check_connectivityCallback);
+ 
 Task task_scheduled_reboot(SCHEDULED_REBOOT_TIMER, TASK_FOREVER, &task_scheduled_rebootCallback);
+
+#define BATTERY_POWERED true
 
 Scheduler runner;
 
@@ -108,10 +105,7 @@ void read_sensors_data()
     data_bytes = Env_Sensor.compressed_bytes;
 
     debug_string("Sensor Read " + String(readBytes) + " bytes", true);
-    if (wifi_Online)
-    {
-      send_mqtt_string("sensor", sensorData, false);
-    }
+    
   }
   else
   {
@@ -127,19 +121,19 @@ void read_sensors_data()
  *******************************************/
 void setup_hardawre()
 {
-  // WIFI Kit series V1 not support Vext control
-  Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-  Heltec.display->init();
-  Heltec.display->setFont(ArialMT_Plain_10);
-  delay(1500);
-  Heltec.display->clear();
-
+    Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
+    Heltec.display->init();
+    Heltec.display->setFont(ArialMT_Plain_10);
+    delay(1500);
+    Heltec.display->clear();
+  
   // on board led...
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
-
-  device_mac = WiFi.macAddress();
-  device_mac.replace(":", "");
+  if (!BATTERY_POWERED)
+  {
+    pinMode(ledPin, OUTPUT);
+    digitalWrite(ledPin, LOW);
+  }
+ 
 }
 
 /**************************************************************************/
@@ -172,27 +166,16 @@ void logo()
 void setup()
 {
   Serial.begin(115200); // Start the Serial Port
-
-  debug_string("Reading config");
-  check_configurations();
-
+ 
   debug_string("Setup hardawre");
   setup_hardawre();
 
-  serial_print_config(); // Print Config to Serial port
+ // serial_print_config(); // Print Config to Serial port
 
   init_lora();
 
   // Initalize the sensors
   check_sensors();
-
-  // Runner has list of tasks that must be run at a set period
-  runner.init();
-
-  // Add task to Runner.
-  runner.addTask(task_scheduled_reboot);
-
-  task_scheduled_reboot.enableDelayed(10000);
 
   delay(1000);
 }
@@ -204,27 +187,16 @@ void loop()
   // Serial.println("*********** main loop ***********");
 
   loopsPM++;
-  runner.execute();  // Timer execution. Runs timed events like connectivity check, scheduled reboot. etc.
+   
 
   // lora loop.....
   lora_loop();
 
   unsigned long currentMillis = millis(); // Check current time
-
-  if (fresh_boot)
-  {
-
-    lora_counter = 0;
-    lora_data_sent = false;
-    send_data_over_lora(data_lora, data_bytes);
-
-    fresh_boot = false;
-  }
-
+ 
   // Send data based on data frequency. default is every 10 seconds
-  if (currentMillis - previousDataMillis >= WM_config.device_config.data_frequency * 1000)
+  if (currentMillis - previousDataMillis >= DEFAULT_SCANNING_FREQUENCY*1000)
   {
-
     dataLoopsPM++; // Count how many times data loop was executed
     previousDataMillis = currentMillis;
     read_sensors_data();
@@ -233,11 +205,15 @@ void loop()
 
     if (lora_data_sent && lora_counter >= 18)
     {
-      lora_counter = 1;
+      lora_counter = 0;
       lora_data_sent = false;
       send_data_over_lora(data_lora, data_bytes);
     }
-
-    display_data_oled();
+    if (!BATTERY_POWERED)
+    {
+      display_data_oled();
+    }
   }
+
+   delay(5000);
 }
