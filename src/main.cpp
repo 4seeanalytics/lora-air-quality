@@ -121,18 +121,8 @@ void read_sensors_data()
  *******************************************/
 void setup_hardawre()
 {
-    Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-    Heltec.display->init();
-    Heltec.display->setFont(ArialMT_Plain_10);
+    Heltec.begin(false /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
     delay(1500);
-    Heltec.display->clear();
-  
-  // on board led...
-  if (!BATTERY_POWERED)
-  {
-    pinMode(ledPin, OUTPUT);
-    digitalWrite(ledPin, LOW);
-  }
  
 }
 
@@ -156,9 +146,7 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
 /**************************************************************************/
 void logo()
 {
-  Heltec.display->clear();
-  Heltec.display->drawXbm(0, 5, logo_width, logo_height, logo_bits);
-  Heltec.display->display();
+ 
 }
 
 /************************************************/
