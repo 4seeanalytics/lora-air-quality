@@ -24,13 +24,7 @@
 
 */
 
-#include "heltec.h"
-#include "images.h"
-
-#include <WiFi.h>
- 
-
-#include <TaskScheduler.h>
+// #include <WiFi.h>
 
 #include "config.h"
  
@@ -59,17 +53,8 @@ bool mqtt_connected = false;
 
 // extern data_config WM_config;
   
-void task_scheduled_rebootCallback();
-
-#define SCHEDULED_REBOOT_TIMER 1 * 25 * 60 * 60 * 1000 // Hours
-#define SCHEDULED_CONNECTIVITY_TIMER 5 * 60 * 1000     // Minutes
-#define SCHEDULED_HEARBEAT_TIMER 1 * 10 * 1000         // Seconds
- 
-Task task_scheduled_reboot(SCHEDULED_REBOOT_TIMER, TASK_FOREVER, &task_scheduled_rebootCallback);
 
 #define BATTERY_POWERED true
-
-Scheduler runner;
 
 String device_mac = "";
 
@@ -93,9 +78,20 @@ String rssi = "RSSI --";
 String packSize = "--";
 String packet;
 
+
+extern bool GOTO_DEEPSLEEP;
+
+// Schedule TX every this many seconds
+// Respect Fair Access Policy and Maximum Duty Cycle!
+// https://www.thethingsnetwork.org/docs/lorawan/duty-cycle.html
+// https://www.loratools.nl/#/airtime
+const unsigned TX_INTERVAL = 60 * 3;
+
 void read_sensors_data()
 {
+  Serial.println("read start");
   int readBytes = Env_Sensor.read();
+  Serial.println("read end");
   if (readBytes > 0)
   {
     String sensorData = Env_Sensor.sensor_data_buffer;
@@ -121,11 +117,11 @@ void read_sensors_data()
  *******************************************/
 void setup_hardawre()
 {
-    Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
-    Heltec.display->init();
-    Heltec.display->setFont(ArialMT_Plain_10);
-    delay(1500);
-    Heltec.display->clear();
+    // Heltec.begin(true /*DisplayEnable Enable*/, true /*Heltec.Heltec.Heltec.LoRa Disable*/, true /*Serial Enable*/, true /*PABOOST Enable*/, BAND /*long BAND*/);
+    // Heltec.display->init();
+    // Heltec.display->setFont(ArialMT_Plain_10);
+    // delay(1500);
+    // Heltec.display->clear();
   
   // on board led...
   if (!BATTERY_POWERED)
@@ -156,9 +152,9 @@ uint32_t getAbsoluteHumidity(float temperature, float humidity)
 /**************************************************************************/
 void logo()
 {
-  Heltec.display->clear();
-  Heltec.display->drawXbm(0, 5, logo_width, logo_height, logo_bits);
-  Heltec.display->display();
+  // Heltec.display->clear();
+  // Heltec.display->drawXbm(0, 5, logo_width, logo_height, logo_bits);
+  // Heltec.display->display();
 }
 
 /************************************************/
@@ -167,20 +163,16 @@ void setup()
 {
   Serial.begin(115200); // Start the Serial Port
  
-  WiFi.disconnect();
-  WiFi.mode(WIFI_OFF);  
-
-  debug_string("Setup hardawre");
+  // debug_string("Setup hardawre");
   setup_hardawre();
 
  // serial_print_config(); // Print Config to Serial port
 
-  init_lora();
-
   // Initalize the sensors
   check_sensors();
 
-  delay(1000);
+  init_lora();
+  // delay(1000);
 }
 
 bool fresh_boot = true;
@@ -191,7 +183,6 @@ void loop()
 
   loopsPM++;
    
-
   // lora loop.....
   lora_loop();
 
@@ -212,11 +203,33 @@ void loop()
       lora_data_sent = false;
       send_data_over_lora(data_lora, data_bytes);
     }
-    if (!BATTERY_POWERED)
-    {
-      display_data_oled();
-    }
+    // if (!BATTERY_POWERED)
+    // {
+    //   display_data_oled();
+    // }
   }
 
-   delay(5000);
+    
+  // static unsigned long lastPrintTime = 0;
+
+  // const bool timeCriticalJobs = os_queryTimeCriticalJobs(ms2osticksRound((TX_INTERVAL * 1000)));
+  //   if (!timeCriticalJobs && GOTO_DEEPSLEEP == true && !(LMIC.opmode & OP_TXRXPEND))
+  //   {
+  //       Serial.print(F("Can go sleep "));
+  //       LoraWANPrintLMICOpmode();
+  //       SaveLMICToRTC(TX_INTERVAL);
+  //       GoDeepSleep();
+  //   }
+  //   else if (lastPrintTime + 2000 < millis())
+  //   {
+  //       Serial.print(F("Cannot sleep "));
+  //       Serial.print(F("TimeCriticalJobs: "));
+  //       Serial.print(timeCriticalJobs);
+  //       Serial.print(" ");
+
+  //       LoraWANPrintLMICOpmode();
+  //       PrintRuntime();
+  //       lastPrintTime = millis();
+  //   }
+
 }

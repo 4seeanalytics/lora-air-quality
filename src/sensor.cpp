@@ -1,6 +1,5 @@
 
 #include "sensor.h"
-#include "heltec.h"
 
 struct pms5003data data;
 
@@ -48,7 +47,7 @@ void check_sensors()
 {
 
   /************************* PM SENSOR ****************************/
-  Heltec.display->clear();
+  // Heltec.display->clear();
   pmsSerial.begin(9600);
 
   for (int i; i < 100; i++)
@@ -62,16 +61,16 @@ void check_sensors()
 
   if (is_aq_present)
   {
-    Heltec.display->drawString(0, 0, "PM Sensor");
-    Heltec.display->drawString(80, 0, "[OK]");
-    Heltec.display->display();
+    // Heltec.display->drawString(0, 0, "PM Sensor");
+    // Heltec.display->drawString(80, 0, "[OK]");
+    // Heltec.display->display();
     Serial.println(" [ AQM PM Present ] ");
   }
   else
   {
-    Heltec.display->drawString(0, 0, "PM Sensor");
-    Heltec.display->drawString(80, 0, "[ERR]");
-    Heltec.display->display();
+    // Heltec.display->drawString(0, 0, "PM Sensor");
+    // Heltec.display->drawString(80, 0, "[ERR]");
+    // Heltec.display->display();
     Serial.println(" [ AQM PM Not found ] ");
   }
 
@@ -84,15 +83,15 @@ void check_sensors()
   {
     Serial.println("ERROR! Starting I2S Port");
     Serial.println("I2S Port: OK");
-    Heltec.display->drawString(0, 12 * 4, "Sound  [ERR]");
-    Heltec.display->display();
+    // Heltec.display->drawString(0, 12 * 4, "Sound  [ERR]");
+    // Heltec.display->display();
   }
   else
   {
     Serial.println("I2S Port: OK");
-    Heltec.display->drawString(0, 12 * 4, "Sound");
-    Heltec.display->drawString(80, 12 * 4, "[OK]");
-    Heltec.display->display();
+    // Heltec.display->drawString(0, 12 * 4, "Sound");
+    // Heltec.display->drawString(80, 12 * 4, "[OK]");
+    // Heltec.display->display();
   }
 
   i2c_scanner();
@@ -511,9 +510,9 @@ void i2c_scanner(void)
       else if (address == 60)
       {
         is_voc_present = true;
-        Heltec.display->drawString(0, 12 * sensorcnt, "VOC/CO2");
-        Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
-        Heltec.display->display();
+        // Heltec.display->drawString(0, 12 * sensorcnt, "VOC/CO2");
+        // Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
+        // Heltec.display->display();
         Serial.println(" [ SGP VOC ] ");
         delay(500);
         sensorcnt++;
@@ -521,9 +520,9 @@ void i2c_scanner(void)
       else if (address == 88)
       {
         is_temp_present = true;
-        Heltec.display->drawString(0, 12 * sensorcnt, "Temp/Humi");
-        Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
-        Heltec.display->display();
+        // Heltec.display->drawString(0, 12 * sensorcnt, "Temp/Humi");
+        // Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
+        // Heltec.display->display();
         Serial.println(" [ AHT10 Temp Humidity ] ");
         delay(500);
         sensorcnt++;
@@ -532,9 +531,9 @@ void i2c_scanner(void)
       else if (address == 57)
       {
         is_light_present = true;
-        Heltec.display->drawString(0, 12 * sensorcnt, "Light");
-        Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
-        Heltec.display->display();
+        // Heltec.display->drawString(0, 12 * sensorcnt, "Light");
+        // Heltec.display->drawString(80, 12 * sensorcnt, "[OK]");
+        // Heltec.display->display();
         Serial.println(" [ TSL2561 Lumen ] ");
         delay(500);
         sensorcnt++;
@@ -573,15 +572,15 @@ void i2c_scanner(void)
 void display_data_oled()
 {
 
-  Heltec.display->clear();
-  Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
-  Heltec.display->setFont(ArialMT_Plain_10);
+  // Heltec.display->clear();
+  // Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+  // Heltec.display->setFont(ArialMT_Plain_10);
 
   // Display TVOC & CO2
-  Heltec.display->drawString(0, 0, "VOC: ");
-  Heltec.display->drawString(25, 0, String(sgp.TVOC));
-  Heltec.display->drawString(60, 0, "CO2: ");
-  Heltec.display->drawString(100, 0, String(sgp.eCO2));
+  // Heltec.display->drawString(0, 0, "VOC: ");
+  // Heltec.display->drawString(25, 0, String(sgp.TVOC));
+  // Heltec.display->drawString(60, 0, "CO2: ");
+  // Heltec.display->drawString(100, 0, String(sgp.eCO2));
 
   if (!sgp.IAQmeasureRaw())
   {
@@ -589,35 +588,35 @@ void display_data_oled()
   }
   else
   {
-    Heltec.display->drawString(0, 12, "H2 ");
-    Heltec.display->drawString(25, 12, String(sgp.rawH2));
+    // Heltec.display->drawString(0, 12, "H2 ");
+    // Heltec.display->drawString(25, 12, String(sgp.rawH2));
 
-    Heltec.display->drawString(60, 12, "ETH  ");
-    Heltec.display->drawString(100, 12, String(sgp.rawEthanol));
+    // Heltec.display->drawString(60, 12, "ETH  ");
+    // Heltec.display->drawString(100, 12, String(sgp.rawEthanol));
   }
 
   // PM 2.5 & PM 10
-  Heltec.display->drawString(0, 24, "PM2.5 ");
-  Heltec.display->drawString(45, 24, String(data.pm25_standard));
+  // Heltec.display->drawString(0, 24, "PM2.5 ");
+  // Heltec.display->drawString(45, 24, String(data.pm25_standard));
 
-  Heltec.display->drawString(60, 24, "PM10 ");
-  Heltec.display->drawString(100, 24, String(data.pm100_standard));
+  // Heltec.display->drawString(60, 24, "PM10 ");
+  // Heltec.display->drawString(100, 24, String(data.pm100_standard));
 
   // Temperature & humidity
-  Heltec.display->drawString(0, 36, "Temp.");
-  Heltec.display->drawString(45, 36, String(temp.temperature));
+  // Heltec.display->drawString(0, 36, "Temp.");
+  // Heltec.display->drawString(45, 36, String(temp.temperature));
 
-  Heltec.display->drawString(60, 36, "Hum.");
-  Heltec.display->drawString(100, 36, String(humidity.relative_humidity));
+  // Heltec.display->drawString(60, 36, "Hum.");
+  // Heltec.display->drawString(100, 36, String(humidity.relative_humidity));
 
   // Lumens
-  Heltec.display->drawString(0, 48, "LUX");
-  Heltec.display->drawString(45, 48, String(event_lux.light));
+  // Heltec.display->drawString(0, 48, "LUX");
+  // Heltec.display->drawString(45, 48, String(event_lux.light));
 
   // Heltec.display->drawString(60, 40, "Hum.");
   // Heltec.display->drawString(100, 40, String(data.pm100_standard));
 
-  Heltec.display->display();
+  // Heltec.display->display();
 }
 
 

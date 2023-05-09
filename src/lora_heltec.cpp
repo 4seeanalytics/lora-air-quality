@@ -2,123 +2,210 @@
 /********************* Lora Heltec ***********************/
 
 #include <Arduino.h>
-
 #include <lmic.h>
 #include <hal/hal.h>
 #include <SPI.h>
-// #include <U8x8lib.h>
-
-#include <Wire.h>
-
-// Define a task handle and initialize it to NULL
-TaskHandle_t task_handle = NULL;
+#include <ttn_credentials.h>
 
 
+bool GOTO_DEEPSLEEP = false;
 
-static const PROGMEM u1_t NWKSKEY[16] = {0x88, 0xfd, 0x96, 0xde, 0xf3, 0x40, 0x75, 0x43, 0x57, 0x6e, 0x2d, 0xcf, 0x1f, 0x0c, 0xac, 0x82};
-static const PROGMEM u1_t APPSKEY[16] = {0xbe, 0x70, 0xcb, 0x6f, 0x85, 0xdf, 0x9d, 0x29, 0xdf, 0xd9, 0x4a, 0x5f, 0xdc, 0xd4, 0x12, 0x19};
-static const u4_t DEVADDR = 0x01178a82; //0x014d469f; //  // <-- Change this address for every node!
+// rename ttn_credentials.h.example to ttn_credentials.h and add you keys
+static const u1_t PROGMEM APPEUI[8] = TTN_APPEUI;
+static const u1_t PROGMEM DEVEUI[8] = TTN_DEVEUI;
+static const u1_t PROGMEM APPKEY[16] = TTN_APPKEY;
+void os_getArtEui(u1_t *buf) { memcpy_P(buf, APPEUI, 8); }
+void os_getDevEui(u1_t *buf) { memcpy_P(buf, DEVEUI, 8); }
+void os_getDevKey(u1_t *buf) { memcpy_P(buf, APPKEY, 16); }
 
-// static uint8_t mydata[300] = "Hi from Sagar!";
-static uint8_t mydata[] = "Hi from Sagar!";
-
+static uint8_t mydata[] = "Test";
 static osjob_t sendjob;
+
+
+// Schedule TX every this many seconds
+// Respect Fair Access Policy and Maximum Duty Cycle!
+// https://www.thethingsnetwork.org/docs/lorawan/duty-cycle.html
+// https://www.loratools.nl/#/airtime
+const unsigned TX_INTERVAL = 60 * 3;
+
+// Saves the LMIC structure during DeepSleep
+RTC_DATA_ATTR lmic_t RTC_LMIC;
+
+#define PIN_LMIC_NSS 18
+#define PIN_LMIC_RST 14
+#define PIN_LMIC_DIO0 26
+#define PIN_LMIC_DIO1 35 //33
+#define PIN_LMIC_DIO2 34 //32
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
-    .nss = 18,
+    .nss = PIN_LMIC_NSS,
     .rxtx = LMIC_UNUSED_PIN,
-    .rst = 14,
-    .dio = {26, 35, 34}}; //{26, 33, 32}
-
-// LED and Button Pins
-int buttonPin = 0;
-int ledPin = 25; // 12
-int boardLED = 25;
-int lastState = 0;
-
-bool lora_data_sent = true; // true for first to exceute
+    .rst = PIN_LMIC_RST,
+    .dio = {PIN_LMIC_DIO0, PIN_LMIC_DIO1, PIN_LMIC_DIO2},
+};
 
 
-// These callbacks are only used in over-the-air activation, so they are
-// left empty here (we cannot leave them out completely unless
-// DISABLE_JOIN is set in config.h, otherwise the linker will complain).
-void os_getArtEui(u1_t *buf) {}
-void os_getDevEui(u1_t *buf) {}
-void os_getDevKey(u1_t *buf) {}
+bool lora_data_sent = true;
 
 
-void init_lora(void)
+// opmode def
+// https://github.com/mcci-catena/arduino-lmic/blob/89c28c5888338f8fc851851bb64968f2a493462f/src/lmic/lmic.h#L233
+void LoraWANPrintLMICOpmode(void)
 {
-    // LMIC init &RESET
-    os_init();
-    LMIC_reset();
-
-// Set static session parameters. Instead of dynamically establishing a session
-// by joining the network, precomputed session parameters are be provided.
-#ifdef PROGMEM
-    // On AVR, these values are stored in flash and only copied to RAM
-    // once. Copy them to a temporary buffer here, LMIC_setSession will
-    // copy them into a buffer of its own again.
-    uint8_t appskey[sizeof(APPSKEY)];
-    uint8_t nwkskey[sizeof(NWKSKEY)];
-    memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-    memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-    LMIC_setSession(0x1, DEVADDR, nwkskey, appskey);
-#else
-    // If not running an AVR with PROGMEM, just use the arrays directly
-    LMIC_setSession(0x1, DEVADDR, NWKSKEY, APPSKEY);
-#endif
-
-    LMIC_setupChannel(0, 868100000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI); // g-band
-    // LMIC_setupChannel(1, 868300000, DR_RANGE_MAP(DR_SF12, DR_SF7B), BAND_CENTI); // g-band
-    // LMIC_setupChannel(2, 868500000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(3, 867100000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(4, 867300000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(5, 867500000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(6, 867700000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(7, 867900000, DR_RANGE_MAP(DR_SF12, DR_SF7), BAND_CENTI);  // g-band
-    // LMIC_setupChannel(8, 868800000, DR_RANGE_MAP(DR_FSK, DR_FSK), BAND_MILLI);   // g2-band
-
-    // Adaptive Data Rate Mode https://www.thethingsnetwork.org/docs/lorawan/adaptive-data-rate.html
-    // LMIC_setAdrMode(1); //Adaptiert Datenrate nach 64 Paketen
-
-    // Disable link check validation
-    LMIC_setLinkCheckMode(0);
-    LMIC.dn2Dr = DR_SF9;
-    // Set data rate and transmit power (note: txpow seems to be ignored by the library)
-    LMIC_setDrTxpow(DR_SF7, 14);
-
-    // LMIC_setClockError(MAX_CLOCK_ERROR * 10 / 100);//https://www.thethingsnetwork.org/forum/t/need-help-with-mcci-lmic-and-ttn-join-wait-issue/30
-    // In my place we are not using 868 MHz
-    // LMIC_disableChannel(0);
-    // LMIC_disableChannel(1);
-    // LMIC_disableChannel(2);
-}
-
-
-void lora_loop()
-{
-    os_runloop_once();
-}
-
-
-void ledFLash(int flashes)
-{
-    int lastStateLED = digitalRead(ledPin);
-    for (int i = 0; i < flashes; i++)
+    Serial.print(F("LMIC.opmode: "));
+    if (LMIC.opmode & OP_NONE)
     {
-        digitalWrite(ledPin, HIGH);
-        delay(300);
-        digitalWrite(ledPin, LOW);
-        delay(300);
+        Serial.print(F("OP_NONE "));
     }
-    digitalWrite(ledPin, lastStateLED);
+    if (LMIC.opmode & OP_SCAN)
+    {
+        Serial.print(F("OP_SCAN "));
+    }
+    if (LMIC.opmode & OP_TRACK)
+    {
+        Serial.print(F("OP_TRACK "));
+    }
+    if (LMIC.opmode & OP_JOINING)
+    {
+        Serial.print(F("OP_JOINING "));
+    }
+    if (LMIC.opmode & OP_TXDATA)
+    {
+        Serial.print(F("OP_TXDATA "));
+    }
+    if (LMIC.opmode & OP_POLL)
+    {
+        Serial.print(F("OP_POLL "));
+    }
+    if (LMIC.opmode & OP_REJOIN)
+    {
+        Serial.print(F("OP_REJOIN "));
+    }
+    if (LMIC.opmode & OP_SHUTDOWN)
+    {
+        Serial.print(F("OP_SHUTDOWN "));
+    }
+    if (LMIC.opmode & OP_TXRXPEND)
+    {
+        Serial.print(F("OP_TXRXPEND "));
+    }
+    if (LMIC.opmode & OP_RNDTX)
+    {
+        Serial.print(F("OP_RNDTX "));
+    }
+    if (LMIC.opmode & OP_PINGINI)
+    {
+        Serial.print(F("OP_PINGINI "));
+    }
+    if (LMIC.opmode & OP_PINGABLE)
+    {
+        Serial.print(F("OP_PINGABLE "));
+    }
+    if (LMIC.opmode & OP_NEXTCHNL)
+    {
+        Serial.print(F("OP_NEXTCHNL "));
+    }
+    if (LMIC.opmode & OP_LINKDEAD)
+    {
+        Serial.print(F("OP_LINKDEAD "));
+    }
+    if (LMIC.opmode & OP_LINKDEAD)
+    {
+        Serial.print(F("OP_LINKDEAD "));
+    }
+    if (LMIC.opmode & OP_TESTMODE)
+    {
+        Serial.print(F("OP_TESTMODE "));
+    }
+    if (LMIC.opmode & OP_UNJOIN)
+    {
+        Serial.print(F("OP_UNJOIN "));
+    }
 }
+
+void LoraWANDebug(lmic_t lmic_check)
+{
+    Serial.println("");
+    Serial.println("");
+
+    LoraWANPrintLMICOpmode();
+    Serial.println("");
+
+    Serial.print(F("LMIC.seqnoUp = "));
+    Serial.println(lmic_check.seqnoUp);
+
+    Serial.print(F("LMIC.globalDutyRate = "));
+    Serial.print(lmic_check.globalDutyRate);
+    Serial.print(F(" osTicks, "));
+    Serial.print(osticks2ms(lmic_check.globalDutyRate) / 1000);
+    Serial.println(F(" sec"));
+
+    Serial.print(F("LMIC.globalDutyAvail = "));
+    Serial.print(lmic_check.globalDutyAvail);
+    Serial.print(F(" osTicks, "));
+    Serial.print(osticks2ms(lmic_check.globalDutyAvail) / 1000);
+    Serial.println(F(" sec"));
+
+    Serial.print(F("LMICbandplan_nextTx = "));
+    Serial.print(LMICbandplan_nextTx(os_getTime()));
+    Serial.print(F(" osTicks, "));
+    Serial.print(osticks2ms(LMICbandplan_nextTx(os_getTime())) / 1000);
+    Serial.println(F(" sec"));
+
+    Serial.print(F("os_getTime = "));
+    Serial.print(os_getTime());
+    Serial.print(F(" osTicks, "));
+    Serial.print(osticks2ms(os_getTime()) / 1000);
+    Serial.println(F(" sec"));
+
+    Serial.print(F("LMIC.txend = "));
+    Serial.println(lmic_check.txend);
+    Serial.print(F("LMIC.txChnl = "));
+    Serial.println(lmic_check.txChnl);
+
+    Serial.println(F("Band \tavail \t\tavail_sec\tlastchnl \ttxcap"));
+    for (u1_t bi = 0; bi < MAX_BANDS; bi++)
+    {
+        Serial.print(bi);
+        Serial.print("\t");
+        Serial.print(lmic_check.bands[bi].avail);
+        Serial.print("\t\t");
+        Serial.print(osticks2ms(lmic_check.bands[bi].avail) / 1000);
+        Serial.print("\t\t");
+        Serial.print(lmic_check.bands[bi].lastchnl);
+        Serial.print("\t\t");
+        Serial.println(lmic_check.bands[bi].txcap);
+    }
+    Serial.println("");
+    Serial.println("");
+}
+
+void PrintRuntime()
+{
+    long seconds = millis() / 1000;
+    Serial.print("Runtime: ");
+    Serial.print(seconds);
+    Serial.println(" seconds");
+}
+
+void PrintLMICVersion()
+{
+    Serial.print(F("LMIC: "));
+    Serial.print(ARDUINO_LMIC_VERSION_GET_MAJOR(ARDUINO_LMIC_VERSION));
+    Serial.print(F("."));
+    Serial.print(ARDUINO_LMIC_VERSION_GET_MINOR(ARDUINO_LMIC_VERSION));
+    Serial.print(F("."));
+    Serial.print(ARDUINO_LMIC_VERSION_GET_PATCH(ARDUINO_LMIC_VERSION));
+    Serial.print(F("."));
+    Serial.println(ARDUINO_LMIC_VERSION_GET_LOCAL(ARDUINO_LMIC_VERSION));
+}
+
+
+
 
 void onEvent(ev_t ev)
 {
-    // Serial.println(ev);
     Serial.print(os_getTime());
     Serial.print(": ");
     switch (ev)
@@ -140,10 +227,42 @@ void onEvent(ev_t ev)
         break;
     case EV_JOINED:
         Serial.println(F("EV_JOINED"));
+        {
+            u4_t netid = 0;
+            devaddr_t devaddr = 0;
+            u1_t nwkKey[16];
+            u1_t artKey[16];
+            LMIC_getSessionKeys(&netid, &devaddr, nwkKey, artKey);
+            Serial.print("netid: ");
+            Serial.println(netid, DEC);
+            Serial.print("devaddr: ");
+            Serial.println(devaddr, HEX);
+            Serial.print("artKey: ");
+            for (size_t i = 0; i < sizeof(artKey); ++i)
+            {
+                Serial.print(artKey[i], HEX);
+            }
+            Serial.println("");
+            Serial.print("nwkKey: ");
+            for (size_t i = 0; i < sizeof(nwkKey); ++i)
+            {
+                Serial.print(nwkKey[i], HEX);
+            }
+            Serial.println("");
+        }
+        // Disable link check validation (automatically enabled
+        // during join, but because slow data rates change max TX
+        // size, we don't use it in this example.
+        LMIC_setLinkCheckMode(0);
         break;
-    case EV_RFU1:
-        Serial.println(F("EV_RFU1"));
-        break;
+    /*
+        || This event is defined but not used in the code. No
+        || point in wasting codespace on it.
+        ||
+        || case EV_RFU1:
+        ||     Serial.println(F("EV_RFU1"));
+        ||     break;
+        */
     case EV_JOIN_FAILED:
         Serial.println(F("EV_JOIN_FAILED"));
         break;
@@ -151,36 +270,17 @@ void onEvent(ev_t ev)
         Serial.println(F("EV_REJOIN_FAILED"));
         break;
     case EV_TXCOMPLETE:
-        ledFLash(2);
         Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
-        // u8x8.drawString(0, 2, "Data Sent");
-        // u8x8.drawString(0, 4, "Button Released");
-
-        lora_data_sent = true;
+        if (LMIC.txrxFlags & TXRX_ACK)
+            Serial.println(F("Received ack"));
         if (LMIC.dataLen)
         {
-            // data received in rx slot after tx
-            Serial.print(F("Data Received: "));
-            //   u8x8.drawString(0, 3, "Data Received: ");
+            Serial.print(F("Received "));
             Serial.print(LMIC.dataLen);
-            Serial.print(F(" bytes for downlink: 0x"));
-            for (int i = 0; i < LMIC.dataLen; i++)
-            {
-                if (LMIC.frame[LMIC.dataBeg + i] < 0x10)
-                {
-                    Serial.print(F("0"));
-                }
-                Serial.print(LMIC.frame[LMIC.dataBeg + i], HEX);
-            }
-            Serial.println();
+            Serial.println(F(" bytes of payload"));
         }
-        // Schedule next transmission
-        // os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(10), do_send);
-        delay(2000);
-        // u8x8.clearLine(1);
-        // u8x8.clearLine(2);
-        // u8x8.clearLine(3);
-        // u8x8.clearLine(4);
+        GOTO_DEEPSLEEP = true;
+        lora_data_sent = true;
         break;
     case EV_LOST_TSYNC:
         Serial.println(F("EV_LOST_TSYNC"));
@@ -198,6 +298,14 @@ void onEvent(ev_t ev)
     case EV_LINK_ALIVE:
         Serial.println(F("EV_LINK_ALIVE"));
         break;
+    /*
+        || This event is defined but not used in the code. No
+        || point in wasting codespace on it.
+        ||
+        || case EV_SCAN_FOUND:
+        ||    Serial.println(F("EV_SCAN_FOUND"));
+        ||    break;
+        */
     case EV_TXSTART:
         Serial.println(F("EV_TXSTART"));
         break;
@@ -208,37 +316,112 @@ void onEvent(ev_t ev)
         /* do not print anything -- it wrecks timing */
         break;
     case EV_JOIN_TXCOMPLETE:
-        Serial.println(F("EV_JOIN_TXCOMPLETE: No JoinAccept"));
+        Serial.println(F("EV_JOIN_TXCOMPLETE: no JoinAccept"));
         break;
-
     default:
-        Serial.println(F("Unknown event"));
-        // u8x8.drawString(0, 2, "Unknown event");
+        Serial.print(F("Unknown event: "));
+        Serial.println((unsigned)ev);
         break;
     }
 }
 
+void do_send(osjob_t *j)
+{
+    // Check if there is not a current TX/RX job running
+    if (LMIC.opmode & OP_TXRXPEND)
+    {
+        Serial.println(F("OP_TXRXPEND, not sending"));
+    }
+    else
+    {
+        // Prepare upstream data transmission at the next possible time.
+        LMIC_setTxData2(1, mydata, sizeof(mydata) - 1, 0);
+        Serial.println(F("Packet queued"));
+    }
+    // Next TX is scheduled after TX_COMPLETE event.
+}
 
-// void do_send(osjob_t *j)
-// {
-//   // Check if there is not a current TX/RX job running
-// //   u8x8.drawString(0, 4, "Button Pressed");
-//   Serial.println(LMIC.opmode);
-//   if (LMIC.opmode & OP_TXRXPEND)
-//   {
-//     Serial.println(F("OP_TXRXPEND, not sending"));
-//     // u8x8.drawString(0, 1, "OP_TXRXPEND, not sending");
-//   }
-//   else
-//   {
-//     Serial.println(F("Packet sending"));
-//     // Prepare upstream data transmission at the next possible time.
-//     LMIC_setTxData2(2, mydata, sizeof(mydata) - 1, 0);
-//     Serial.println(F("Packet queued"));
-//     // u8x8.drawString(0, 1, "Packet queued");
-//   }
-//   // Next TX is scheduled after TX_COMPLETE event.
-// }
+
+void SaveLMICToRTC(int deepsleep_sec)
+{
+    Serial.println(F("Save LMIC to RTC"));
+    RTC_LMIC = LMIC;
+
+    // ESP32 can't track millis during DeepSleep and no option to advanced millis after DeepSleep.
+    // Therefore reset DutyCyles
+
+    unsigned long now = millis();
+
+    // EU Like Bands
+#if defined(CFG_LMIC_EU_like)
+    Serial.println(F("Reset CFG_LMIC_EU_like band avail"));
+    for (int i = 0; i < MAX_BANDS; i++)
+    {
+        ostime_t correctedAvail = RTC_LMIC.bands[i].avail - ((now / 1000.0 + deepsleep_sec) * OSTICKS_PER_SEC);
+        if (correctedAvail < 0)
+        {
+            correctedAvail = 0;
+        }
+        RTC_LMIC.bands[i].avail = correctedAvail;
+    }
+
+    RTC_LMIC.globalDutyAvail = RTC_LMIC.globalDutyAvail - ((now / 1000.0 + deepsleep_sec) * OSTICKS_PER_SEC);
+    if (RTC_LMIC.globalDutyAvail < 0)
+    {
+        RTC_LMIC.globalDutyAvail = 0;
+    }
+#else
+    Serial.println(F("No DutyCycle recalculation function!"));
+#endif
+}
+
+void LoadLMICFromRTC()
+{
+    Serial.println(F("Load LMIC from RTC"));
+    LMIC = RTC_LMIC;
+}
+
+
+void init_lora(void)
+{
+    PrintLMICVersion();
+
+    // LMIC init
+    os_init();
+
+    // Reset the MAC state. Session and pending data transfers will be discarded.
+    LMIC_reset();
+
+    delay(500); // imp note before reading from rtc please wait for sometime.
+
+    if (RTC_LMIC.seqnoUp != 0)
+    {
+        LoadLMICFromRTC();
+    }
+
+    LoraWANDebug(LMIC);
+
+    // Start job (sending automatically starts OTAA too)
+    do_send(&sendjob);
+}
+
+
+void lora_loop()
+{
+    os_runloop_once();
+}
+
+
+
+void GoDeepSleep()
+{
+    Serial.println(F("Go DeepSleep"));
+    PrintRuntime();
+    Serial.flush();
+    esp_sleep_enable_timer_wakeup(TX_INTERVAL * 1000000);
+    esp_deep_sleep_start();
+}
+
 
 
 void do_send(osjob_t *j , char * data, int sizebytes)
@@ -258,14 +441,13 @@ void do_send(osjob_t *j , char * data, int sizebytes)
         memcpy(mydata, data, sizebytes);
 
         // LMIC_setTxData2(1, mydata, sizeof(mydata) - 1, 0);
-        LMIC_setTxData2(1, mydata, sizebytes, 1);
+        LMIC_setTxData2(1, mydata, sizebytes, 0);
         Serial.println(F("Packet queued"));
         Serial.println(F(str));
         // u8x8.drawString(0, 1, "Packet queued");
     }
     // Next TX is scheduled after TX_COMPLETE event.
 }
-
 
 void send_data_over_lora(char * L_dta , int bytes)
 {

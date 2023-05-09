@@ -10,8 +10,11 @@
 
 #include <ArduinoJson.h>
 
-#define PM_RX 13 //18
-#define PM_TX 12 //19
+// #define PM_RX 13 //18
+// #define PM_TX 12 //19
+
+#define PM_RX 18
+#define PM_TX 19
 
 // Structure in which PM Sensor sends data to Serial port
 struct pms5003data
