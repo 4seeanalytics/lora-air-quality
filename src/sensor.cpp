@@ -25,6 +25,7 @@
 */
 
 #include "sensor.h"
+#include "soundsensor.h"
 
 struct pms5003data data;
 
@@ -57,7 +58,7 @@ bool is_light_present = false;
 bool is_mic_present = false;
 
 int pm1 = 0, pm25 = 0, pm10 = 0, voc = 0,
-    co2 = 0, Temp = 0, humi = 0, lux = 0, rawh2 = 0, raweth = 0;
+    co2 = 0, Temp = 0, humi = 0, lux = 0, rawh2 = 0, raweth = 0, mic_decibel = 0;
 
 /**************************************************************************/
 /*
@@ -435,10 +436,13 @@ void check_sensors()
   i2c_scanner();
 
   // Set up I2S
-  i2s_install();
-  i2s_setpin();
+  // i2s_install();
+  // i2s_setpin();
 
-  if (!i2s_start(I2S_PORT) == ESP_OK)
+  esp_err_t result = init_i2s_mic();
+
+  // if (!i2s_start(I2S_PORT) == ESP_OK)
+  if (result != ESP_OK)
   {
     is_mic_present = false;
     Serial.println("ERROR! Starting I2S Port");
@@ -694,7 +698,7 @@ void display_data_oled()
 
   // Display TVOC & CO2
   Heltec.display->drawString(0, 0, "VOC: ");
-  Heltec.display->drawString(25, 0, String(sgp.TVOC));
+  Heltec.display->drawString(45, 0, String(sgp.TVOC));
   Heltec.display->drawString(60, 0, "CO2: ");
   Heltec.display->drawString(100, 0, String(sgp.eCO2));
 
@@ -705,33 +709,33 @@ void display_data_oled()
   else
   {
 
-    Heltec.display->drawString(0, 12, "H2 ");
+    Heltec.display->drawString(0, 12, "H2:");
     Heltec.display->drawString(25, 12, String(sgp.rawH2));
 
-    Heltec.display->drawString(60, 12, "ETH  ");
+    Heltec.display->drawString(60, 12, "ETH: ");
     Heltec.display->drawString(100, 12, String(sgp.rawEthanol));
   }
 
   // PM 2.5 & PM 10
-  Heltec.display->drawString(0, 24, "PM2.5 ");
+  Heltec.display->drawString(0, 24, "PM2.5:");
   Heltec.display->drawString(45, 24, String(pm25));
 
-  Heltec.display->drawString(60, 24, "PM10 ");
+  Heltec.display->drawString(60, 24, "PM10:");
   Heltec.display->drawString(100, 24, String(pm10));
 
   // Temperature & humidity
-  Heltec.display->drawString(0, 36, "Temp.");
-  Heltec.display->drawString(45, 36, String(temp.temperature));
+  Heltec.display->drawString(0, 36, "Temp:");
+  Heltec.display->drawString(30, 36, String(temp.temperature));
 
-  Heltec.display->drawString(60, 36, "Hum.");
+  Heltec.display->drawString(60, 36, "Hum:");
   Heltec.display->drawString(100, 36, String(humidity.relative_humidity));
 
   // Lumens
-  Heltec.display->drawString(0, 48, "LUX");
-  Heltec.display->drawString(45, 48, String(event_lux.light));
+  Heltec.display->drawString(0, 48, "Lux:");
+  Heltec.display->drawString(25, 48, String(event_lux.light));
 
-  // Heltec.display->drawString(60, 40, "Hum.");
-  // Heltec.display->drawString(100, 40, String(data.pm100_standard));
+  Heltec.display->drawString(60, 48, "Mic:");
+  Heltec.display->drawString(100, 48, String(mic_decibel));
 
   Heltec.display->display();
 }
@@ -817,7 +821,19 @@ int ENV_Sensor::read(void)
 
   if (is_mic_present)
   {
-    read_mic();
+    // read_mic();
+    mic_decibel = read_i2s_mic();
+    if (!(mic_decibel > 0))
+    {
+      mic_decibel = 0;
+    }
+    doc["db"] = mic_decibel;
+    compressed_data += String(mic_decibel) + ":";
+    active_sensor += "1:";
+  }
+  else
+  {
+    active_sensor += "0:";
   }
 
   doc["metadata"]["type"] = "ENV";

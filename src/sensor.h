@@ -15,9 +15,9 @@
 
 
 // Connections to I2S microphone
-#define I2S_WS 25
-#define I2S_SD 33
-#define I2S_SCK 32
+// #define I2S_WS 25
+// #define I2S_SD 32//33
+// #define I2S_SCK 33//32
 
 #define PM_RX 18
 #define PM_TX 19
